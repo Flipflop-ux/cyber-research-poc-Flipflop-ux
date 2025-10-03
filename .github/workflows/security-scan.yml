@@ -1,0 +1,37 @@
+name: Security scan
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Search for likely secrets
+        id: scan
+        run: |
+          set -e
+          echo "Scanning repository for high-risk patterns..."
+          GREP_PATTERNS='SECRET|SECRET_KEY|API_KEY|PASSWORD|DB_PASSWORD|ACCESS_KEY|PRIVATE_KEY'
+          LOG=scan-results.log
+          echo "Scan results for patterns: $GREP_PATTERNS" > $LOG
+          grep -R --line-number -I -nE "$GREP_PATTERNS" . || true
+          grep -R --line-number -I -nE "$GREP_PATTERNS" . >> $LOG || true
+          if grep -q -E "$GREP_PATTERNS" $LOG; then
+            echo "Potential secrets found! See artifact." 
+            cat $LOG
+          else
+            echo "No matches found."
+          fi
+
+      - name: Upload scan log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scan-results
+          path: scan-results.log
